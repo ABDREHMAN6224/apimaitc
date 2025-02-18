@@ -1,6 +1,5 @@
 import dotenv from "dotenv";
 import { google } from "googleapis";
-import path from "path";
 import { Client } from "@notionhq/client";
 // @ts-ignore
 import cron from "node-cron";
@@ -23,6 +22,7 @@ const getTasks = async (auth: any) => {
   const listData = res.data.items?.map((item) => {
     return { id: item.id, title: item.title, updated: item.updated };
   });
+//   promisifying because without awaiting this task allTasks array will be empty at execution time
   await Promise.all(
     listData?.map(async (list) => {
       const res = await tasks.tasks.list({
@@ -102,6 +102,7 @@ const syncTasks = async () => {
       const tasks = await getTasks(auth);
       const ids = await getNotionTaskIds();
       syncTasksToNotion(
+        // only add new tasks
         tasks.filter((task) => !ids.some((id) => id == task.id))
       );
     })
@@ -112,4 +113,13 @@ const syncTasks = async () => {
 
 
 syncTasks();
+// * * * * *
+// | | | | |
+// | | | | +----- day of the week (0 - 7) (Sunday=0 or 7)
+// | | | +------- month (1 - 12)
+// | | +--------- day of the month (1 - 31)
+// | +----------- hour (0 - 23)
+// +------------- minute (0 - 59)
+
+// checks every two minutes
 cron.schedule("*/2 * * * *", syncTasks);
