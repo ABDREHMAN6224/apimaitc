@@ -128,6 +128,7 @@ const syncTasks = async () => {
       const tasks = await getTasks(auth);
       const ids = await getNotionTaskIds();
       const deleteIds = ids.filter((id) => !tasks.some((t) => t.id == id));
+    //   delete tasks which were deleted by user in google tasks
       await deleteFromNotion(deleteIds);
         await syncTasksToNotion(
           // only add new tasks
