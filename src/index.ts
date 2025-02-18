@@ -5,19 +5,11 @@ import { Client } from "@notionhq/client";
 // @ts-ignore
 import cron from "node-cron";
 // @ts-ignore
-import { authenticate } from "@google-cloud/local-auth";
 import { AuthClient } from "./utils/Auth";
+import { Task } from "./utils/types";
 dotenv.config();
 
-type Task = {
-  id: string;
-  title: string;
-  updated: Date;
-  due: Date | null;
-  completed: string;
-};
 
-const SCOPES = ["https://www.googleapis.com/auth/tasks"];
 
 
 
@@ -117,5 +109,7 @@ const syncTasks = async () => {
       console.log(err);
     });
 };
+
+
 syncTasks();
-cron.schedule("*/1 * * * *", syncTasks);
+cron.schedule("*/2 * * * *", syncTasks);
