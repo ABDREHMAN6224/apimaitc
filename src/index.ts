@@ -8,10 +8,6 @@ import { AuthClient } from "./utils/Auth";
 import { Task } from "./utils/types";
 dotenv.config();
 
-
-
-
-
 const notion = new Client({ auth: process.env.NOTION_SECRET });
 const databaseId = process.env.NOTION_DB_ID;
 
@@ -22,17 +18,15 @@ const getTasks = async (auth: any) => {
   const listData = res.data.items?.map((item) => {
     return { id: item.id, title: item.title, updated: item.updated };
   });
-//   promisifying because without awaiting this task allTasks array will be empty at execution time
+  //   promisifying because without awaiting this task allTasks array will be empty at execution time
   await Promise.all(
     listData?.map(async (list) => {
       const res = await tasks.tasks.list({
         tasklist: list.id!,
         showHidden: true,
         showAssigned: true,
-        showDeleted: true,
         showCompleted: true,
       });
-
       const ts = res.data.items?.map((item) => ({
         id: item.id!,
         title: item.title ?? "No title",
@@ -54,12 +48,45 @@ async function getNotionTaskIds() {
 
   // @ts-ignore
   const ids = response.results.map(
-      // @ts-ignore
+    // @ts-ignore
     (page) => page.properties.googleId.rich_text[0].text.content
   );
 
   return ids;
 }
+
+async function deleteFromNotion(ids: string[]) {
+  try {
+    for (let googleId of ids) {
+      const response = await notion.databases.query({
+        database_id: databaseId!,
+        filter: {
+          property: "googleId",
+          rich_text: {
+            equals: googleId,
+          },
+        },
+      });
+
+      if (response.results.length === 0) {
+        console.log(`No task found with googleId: ${googleId}`);
+        return;
+      }
+
+      const pageId = response.results[0].id;
+
+      await notion.pages.update({
+        page_id: pageId,
+        archived: true,
+      });
+
+      console.log(`Task with googleId "${googleId}" deleted from Notion.`);
+    }
+  } catch (error) {
+    console.error("Error deleting task:", error);
+  }
+}
+
 
 async function syncTasksToNotion(tasks: Task[]) {
   try {
@@ -95,22 +122,22 @@ async function syncTasksToNotion(tasks: Task[]) {
   }
 }
 
-
 const syncTasks = async () => {
   AuthClient.getInstance()
     .auth.then(async (auth: AuthClient) => {
       const tasks = await getTasks(auth);
       const ids = await getNotionTaskIds();
-      syncTasksToNotion(
-        // only add new tasks
-        tasks.filter((task) => !ids.some((id) => id == task.id))
-      );
+      const deleteIds = ids.filter((id) => !tasks.some((t) => t.id == id));
+      await deleteFromNotion(deleteIds);
+        await syncTasksToNotion(
+          // only add new tasks
+          tasks.filter((task) => !ids.some((id) => id == task.id))
+        );
     })
     .catch((err: any) => {
       console.log(err);
     });
 };
-
 
 syncTasks();
 // * * * * *
@@ -121,5 +148,5 @@ syncTasks();
 // | +----------- hour (0 - 23)
 // +------------- minute (0 - 59)
 
-// checks every two minutes
+// checks every two minutes and adds new tasks on notion
 cron.schedule("*/2 * * * *", syncTasks);
